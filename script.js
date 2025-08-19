@@ -66,14 +66,15 @@ document.addEventListener('DOMContentLoaded', function() {
         showResolutionProcess(domain, recordType);
         
         try {
-            const response = await fetch('/resolve', {
+            const response = await fetch('/api/resolve', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     domain: domain,
-                    type: recordType
+                    recordType: recordType,
+                    dnsServer: 'google'
                 })
             });
             
