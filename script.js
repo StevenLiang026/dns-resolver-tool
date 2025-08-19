@@ -107,10 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'step1', text: '🔍 开始解析域名...', delay: 0 },
             { id: 'step2', text: `📡 查询 ${recordType} 记录类型...`, delay: 400 },
             { id: 'step3', text: '🌐 连接DNS服务器...', delay: 800 },
-            { id: 'step4', text: '⚡ 并发查询多个DNS服务器...', delay: 1200 },
-            { id: 'step5', text: '🔄 处理DNS响应数据...', delay: 1600 },
-            { id: 'step6', text: '🌍 获取IP地理位置信息...', delay: 2000 },
-            { id: 'step7', text: '🛡️ 检测CDN服务商...', delay: 2400 }
+            { id: 'step4', text: '⚡ 处理DNS响应数据...', delay: 1200 }
         ];
         
         let processHTML = `
@@ -236,121 +233,61 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="results-header">
                     <h3>📊 DNS解析结果</h3>
                     <div class="result-meta">
-                        <span class="domain">${data.domain}</span>
-                        <span class="timestamp">${formatTimestamp(data.timestamp)}</span>
+                        <span class="domain">${data.domain || '未知域名'}</span>
+                        <span class="timestamp">${new Date().toLocaleString('zh-CN')}</span>
                     </div>
                 </div>
+                <div class="dns-records-section">
+                    <div class="record-type-section">
+                        <h4 class="record-type-title">${data.recordType || 'DNS'} 记录</h4>
+                        <div class="records-list">
         `;
         
-        // DNS记录结果
-        if (data.dns_records) {
-            html += '<div class="dns-records-section">';
-            
-            Object.entries(data.dns_records).forEach(([recordType, records]) => {
-                html += `
-                    <div class="record-type-section">
-                        <h4 class="record-type-title">${recordType} 记录</h4>
-                        <div class="records-list">
-                `;
-                
-                if (records.length === 0 || records.every(record => record.error)) {
-                    // 如果所有记录都是错误，显示友好提示
-                    const suggestions = {
-                        'A': '建议检查域名是否正确，或尝试 CNAME 记录',
-                        'AAAA': '该域名可能不支持IPv6，建议尝试 A 记录',
-                        'CNAME': '该域名可能是根域名，建议尝试 A 记录',
-                        'MX': '该域名可能没有配置邮件服务，这是正常的',
-                        'NS': '该域名可能没有配置名称服务器记录',
-                        'TXT': '该域名没有配置文本记录，这是正常的',
-                        'SOA': '该域名可能没有权威记录',
-                        'PTR': '该IP地址没有反向DNS记录'
-                    };
-                    
-                    html += `
-                        <div class="record-item info">
-                            <span class="record-icon">ℹ️</span>
-                            <div class="record-details">
-                                <span class="record-value">该域名没有 ${recordType} 记录</span>
-                                <div class="record-meta">
-                                    <span class="suggestion">💡 ${suggestions[recordType] || '建议尝试其他记录类型'}</span>
-                                </div>
-                            </div>
+        // 处理简单的DNS查询结果
+        if (data.result && data.result !== '未找到该类型的DNS记录') {
+            html += `
+                <div class="record-item success">
+                    <span class="record-icon">✅</span>
+                    <div class="record-details">
+                        <div class="record-value">${data.result.replace(/\n/g, '<br>')}</div>
+                        <div class="record-meta">
+                            <span class="dns-server">DNS服务器: ${data.dnsServer || 'Google'}</span>
                         </div>
-                    `;
-                } else {
-                    records.forEach(record => {
-                        if (record.error) {
-                            // 简化错误显示，不显示技术细节
-                            if (!record.error.includes('does not contain an answer')) {
-                                html += `
-                                    <div class="record-item error">
-                                        <span class="record-icon">❌</span>
-                                        <span class="record-value">查询失败: ${record.dns_server || '未知DNS服务器'}</span>
-                                    </div>
-                                `;
-                            }
-                        } else {
-                            html += `
-                                <div class="record-item success">
-                                    <span class="record-icon">✅</span>
-                                    <div class="record-details">
-                                        <span class="record-value">${record.value}</span>
-                                        <div class="record-meta">
-                                            <span class="ttl">TTL: ${record.ttl || 'N/A'}</span>
-                                            <span class="dns-server">DNS: ${record.dns_server || 'N/A'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                    });
-                }
-                
-                html += '</div></div>';
-            });
-            
-            html += '</div>';
-        }
-        
-        // CDN检测结果
-        if (data.detected_cdns && data.detected_cdns.length > 0) {
-            html += `
-                <div class="cdn-section">
-                    <h4>🛡️ 检测到的CDN服务商</h4>
-                    <div class="cdn-list">
-            `;
-            
-            data.detected_cdns.forEach(cdn => {
-                html += `<span class="cdn-badge">${cdn}</span>`;
-            });
-            
-            html += '</div></div>';
-        }
-        
-        // IP地理位置信息
-        if (data.ip_locations && Object.keys(data.ip_locations).length > 0) {
-            html += `
-                <div class="location-section">
-                    <h4>🌍 IP地理位置信息</h4>
-                    <div class="location-list">
-            `;
-            
-            Object.entries(data.ip_locations).forEach(([ip, location]) => {
-                html += `
-                    <div class="location-item">
-                        <span class="ip-address">${ip}</span>
-                        <span class="location-info">
-                            ${location.country || ''} ${location.region || ''} ${location.city || ''}
-                            ${location.isp ? `(${location.isp})` : ''}
-                        </span>
                     </div>
-                `;
-            });
+                </div>
+            `;
+        } else {
+            // 显示未找到记录的友好提示
+            const suggestions = {
+                'A': '建议检查域名是否正确，或尝试 CNAME 记录',
+                'AAAA': '该域名可能不支持IPv6，建议尝试 A 记录',
+                'CNAME': '该域名可能是根域名，建议尝试 A 记录',
+                'MX': '该域名可能没有配置邮件服务，这是正常的',
+                'NS': '该域名可能没有配置名称服务器记录',
+                'TXT': '该域名没有配置文本记录，这是正常的',
+                'SOA': '该域名可能没有权威记录',
+                'PTR': '该IP地址没有反向DNS记录'
+            };
             
-            html += '</div></div>';
+            html += `
+                <div class="record-item info">
+                    <span class="record-icon">ℹ️</span>
+                    <div class="record-details">
+                        <span class="record-value">该域名没有 ${data.recordType || 'DNS'} 记录</span>
+                        <div class="record-meta">
+                            <span class="suggestion">💡 ${suggestions[data.recordType] || '建议尝试其他记录类型'}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
         
-        html += '</div>';
+        html += `
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
         
         // 平滑过渡显示结果
         setTimeout(() => {
