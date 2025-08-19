@@ -46,11 +46,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const domain = domainInput.value.trim();
         const recordType = recordTypeSelect.value;
-        const dnsServer = dnsServerInput.value.trim();
         
         console.log('域名:', domain);
         console.log('记录类型:', recordType);
-        console.log('DNS服务器:', dnsServer);
         
         if (!domain) {
             showError('请输入域名');
@@ -62,8 +60,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // 显示解析过程
-        showResolutionProcess(domain, recordType);
+        // 显示简单的加载状态
+        if (resultsSection) {
+            resultsSection.style.display = 'block';
+            resultsContent.innerHTML = `
+                <div class="loading-simple">
+                    <div class="loading-spinner">🔄</div>
+                    <div class="loading-text">正在解析 ${domain} 的 ${recordType} 记录...</div>
+                </div>
+            `;
+        }
         
         try {
             const response = await fetch('/api/resolve', {
@@ -84,16 +90,14 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('响应数据:', data);
             
             if (response.ok) {
-                // 显示完成状态
-                updateProcessStep('complete', '✅ 解析完成！');
-                setTimeout(() => displayResults(data), 800);
+                displayResults(data);
                 currentResults = data;
             } else {
-                updateProcessStep('error', '❌ 解析失败: ' + (data.error || '未知错误'));
+                showError('解析失败: ' + (data.error || '未知错误'));
             }
         } catch (error) {
             console.error('请求错误:', error);
-            updateProcessStep('error', '❌ 网络错误: ' + error.message);
+            showError('网络错误: ' + error.message);
         }
     }
     
