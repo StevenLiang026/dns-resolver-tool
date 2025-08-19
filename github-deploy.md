@@ -55,22 +55,24 @@
 | 团队协作 | ✅ 多人可贡献 | ❌ 仅个人使用 |
 | 备份安全 | ✅ GitHub云端备份 | ❌ 仅本地文件 |
 
-## 📝 快速命令
+## 📝 快速命令（PowerShell）
 
 如果你已经有GitHub账号，可以直接运行：
 
-```bash
-# 进入项目目录
-cd dns-resolver-tool
-
-# 初始化Git
+```powershell
+# 初始化Git（已完成）
 git init
 git add .
 git commit -m "DNS解析工具 - 美观界面版本"
 
-# 连接GitHub（替换为你的仓库地址）
-git remote add origin https://github.com/你的用户名/dns-resolver-tool.git
+# 创建main分支
+git branch -M main
+
+# 连接GitHub（替换为你的实际仓库地址）
+git remote add origin https://github.com/你的GitHub用户名/dns-resolver-tool.git
 git push -u origin main
 ```
+
+**注意：请将上面的"你的GitHub用户名"替换为你的实际GitHub用户名！**
 
 然后在Vercel导入这个仓库即可！
