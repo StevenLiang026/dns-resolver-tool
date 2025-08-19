@@ -125,16 +125,15 @@ module.exports = async (req, res) => {
                 }
 
                 // 如果指定了DNS服务器，只查询该服务器
+                // 如果指定了DNS服务器，只查询该服务器
                 if (dnsServer && DNS_SERVERS[dnsServer]) {
                     const result = await executeDNSQuery(domain, recordType.toUpperCase(), DNS_SERVERS[dnsServer]);
                     res.json({
                         domain,
                         recordType: recordType.toUpperCase(),
-                        results: [{
-                            server: dnsServer,
-                            serverIP: DNS_SERVERS[dnsServer],
-                            ...result
-                        }]
+                        dnsServer: dnsServer,
+                        result: result.result,
+                        raw: result.raw
                     });
                     return;
                 }
