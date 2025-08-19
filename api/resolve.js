@@ -1,5 +1,4 @@
 const { exec } = require('child_process');
-const url = require('url');
 
 // DNS服务器配置
 const DNS_SERVERS = {
@@ -64,48 +63,47 @@ module.exports = async (req, res) => {
         return;
     }
 
-    // 只处理DNS解析API请求
-    if (req.method === 'POST' && (req.url === '/api/resolve' || req.url.includes('/api/resolve'))) {
-        try {
-            let body = '';
-            req.on('data', chunk => {
-                body += chunk.toString();
-            });
-
-            req.on('end', async () => {
-                try {
-                    const { domain, recordType, dnsServer } = JSON.parse(body);
-
-                    if (!domain || !recordType || !dnsServer) {
-                        res.status(400).json({ error: '缺少必要参数' });
-                        return;
-                    }
-
-                    if (!RECORD_TYPES.includes(recordType.toUpperCase())) {
-                        res.status(400).json({ error: '不支持的记录类型' });
-                        return;
-                    }
-
-                    if (!DNS_SERVERS[dnsServer]) {
-                        res.status(400).json({ error: '不支持的DNS服务器' });
-                        return;
-                    }
-
-                    const result = await executeDNSQuery(domain, recordType.toUpperCase(), DNS_SERVERS[dnsServer]);
-                    res.json(result);
-
-                } catch (error) {
-                    console.error('DNS解析错误:', error);
-                    res.status(500).json({ error: error.message });
-                }
-            });
-
-        } catch (error) {
-            console.error('请求处理错误:', error);
-            res.status(500).json({ error: '服务器内部错误' });
-        }
+    if (req.method !== 'POST') {
+        res.status(405).json({ error: '只支持POST请求' });
         return;
     }
 
-    res.status(404).json({ error: '接口不存在' });
+    try {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+
+        req.on('end', async () => {
+            try {
+                const { domain, recordType, dnsServer } = JSON.parse(body);
+
+                if (!domain || !recordType || !dnsServer) {
+                    res.status(400).json({ error: '缺少必要参数' });
+                    return;
+                }
+
+                if (!RECORD_TYPES.includes(recordType.toUpperCase())) {
+                    res.status(400).json({ error: '不支持的记录类型' });
+                    return;
+                }
+
+                if (!DNS_SERVERS[dnsServer]) {
+                    res.status(400).json({ error: '不支持的DNS服务器' });
+                    return;
+                }
+
+                const result = await executeDNSQuery(domain, recordType.toUpperCase(), DNS_SERVERS[dnsServer]);
+                res.json(result);
+
+            } catch (error) {
+                console.error('DNS解析错误:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+    } catch (error) {
+        console.error('请求处理错误:', error);
+        res.status(500).json({ error: '服务器内部错误' });
+    }
 };
