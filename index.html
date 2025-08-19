@@ -45,10 +45,17 @@
                 </div>
 
                 <div class="input-group">
+                <div class="input-group">
                     <label for="dns-server">DNS服务器</label>
-                    <div class="input-wrapper">
+                    <div class="select-wrapper">
                         <i class="fas fa-server"></i>
-                        <input type="text" id="dns-server" placeholder="可选，如 8.8.8.8" />
+                        <select id="dns-server">
+                            <option value="all">🌐 查询所有服务器</option>
+                            <option value="google">🔍 Google DNS (8.8.8.8)</option>
+                            <option value="cloudflare">⚡ Cloudflare DNS (1.1.1.1)</option>
+                            <option value="opendns">🛡️ OpenDNS (208.67.222.222)</option>
+                            <option value="quad9">🔒 Quad9 DNS (9.9.9.9)</option>
+                        </select>
                     </div>
                 </div>
 

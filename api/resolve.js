@@ -114,7 +114,7 @@ module.exports = async (req, res) => {
             try {
                 const { domain, recordType, dnsServer } = JSON.parse(body);
 
-                if (!domain || !recordType || !dnsServer) {
+                if (!domain || !recordType) {
                     res.status(400).json({ error: '缺少必要参数' });
                     return;
                 }
@@ -124,13 +124,47 @@ module.exports = async (req, res) => {
                     return;
                 }
 
-                if (!DNS_SERVERS[dnsServer]) {
-                    res.status(400).json({ error: '不支持的DNS服务器' });
+                // 如果指定了DNS服务器，只查询该服务器
+                if (dnsServer && DNS_SERVERS[dnsServer]) {
+                    const result = await executeDNSQuery(domain, recordType.toUpperCase(), DNS_SERVERS[dnsServer]);
+                    res.json({
+                        domain,
+                        recordType: recordType.toUpperCase(),
+                        results: [{
+                            server: dnsServer,
+                            serverIP: DNS_SERVERS[dnsServer],
+                            ...result
+                        }]
+                    });
                     return;
                 }
 
-                const result = await executeDNSQuery(domain, recordType.toUpperCase(), DNS_SERVERS[dnsServer]);
-                res.json(result);
+                // 否则查询所有DNS服务器
+                const promises = Object.entries(DNS_SERVERS).map(async ([serverName, serverIP]) => {
+                    try {
+                        const result = await executeDNSQuery(domain, recordType.toUpperCase(), serverIP);
+                        return {
+                            server: serverName,
+                            serverIP: serverIP,
+                            ...result
+                        };
+                    } catch (error) {
+                        return {
+                            server: serverName,
+                            serverIP: serverIP,
+                            error: error.message,
+                            result: '查询失败'
+                        };
+                    }
+                });
+
+                const results = await Promise.all(promises);
+                
+                res.json({
+                    domain,
+                    recordType: recordType.toUpperCase(),
+                    results: results
+                });
 
             } catch (error) {
                 console.error('DNS解析错误:', error);

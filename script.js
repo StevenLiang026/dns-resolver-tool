@@ -45,10 +45,13 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('开始解析...');
         
         const domain = domainInput.value.trim();
+        const domain = domainInput.value.trim();
         const recordType = recordTypeSelect.value;
+        const dnsServer = dnsServerInput.value;
         
         console.log('域名:', domain);
         console.log('记录类型:', recordType);
+        console.log('DNS服务器:', dnsServer);
         
         if (!domain) {
             showError('请输入域名');
@@ -60,28 +63,35 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // 显示简单的加载状态
+        // 显示加载状态
         if (resultsSection) {
             resultsSection.style.display = 'block';
+            const serverText = dnsServer === 'all' ? '所有DNS服务器' : `${dnsServer} DNS服务器`;
             resultsContent.innerHTML = `
                 <div class="loading-simple">
                     <div class="loading-spinner">🔄</div>
-                    <div class="loading-text">正在解析 ${domain} 的 ${recordType} 记录...</div>
+                    <div class="loading-text">正在通过 ${serverText} 解析 ${domain} 的 ${recordType} 记录...</div>
                 </div>
             `;
         }
         
         try {
+            const requestBody = {
+                domain: domain,
+                recordType: recordType
+            };
+            
+            // 如果不是查询所有服务器，则指定DNS服务器
+            if (dnsServer !== 'all') {
+                requestBody.dnsServer = dnsServer;
+            }
+            
             const response = await fetch('/api/resolve', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    domain: domain,
-                    recordType: recordType,
-                    dnsServer: 'google'
-                })
+                body: JSON.stringify(requestBody)
             });
             
             console.log('响应状态:', response.status);
