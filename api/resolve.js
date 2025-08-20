@@ -33,20 +33,7 @@ async function executeDNSQuery(domain, recordType, dnsServerIP = null) {
         switch (recordType.toUpperCase()) {
             case 'A':
                 if (dnsServerIP) {
-                    // 尝试多次查询以获取更多IP地址
-                    const queries = [];
-                    for (let i = 0; i < 3; i++) {
-                        queries.push(new Promise((resolve, reject) => {
-                            resolver.resolve4(domain, { ttl: false }, (err, addresses) => {
-                                if (err) resolve([]);
-                                else resolve(Array.isArray(addresses) ? addresses : [addresses]);
-                            });
-                        }));
-                    }
-                    
-                    const results = await Promise.all(queries);
-                    const allAddresses = [...new Set(results.flat())]; // 去重
-                    result = allAddresses.length > 0 ? allAddresses : await new Promise((resolve, reject) => {
+                    result = await new Promise((resolve, reject) => {
                         resolver.resolve4(domain, (err, addresses) => {
                             if (err) reject(err);
                             else resolve(addresses);
