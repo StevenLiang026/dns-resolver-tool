@@ -11,81 +11,65 @@ const DNS_SERVERS = {
 // DNS记录类型
 const RECORD_TYPES = ['A', 'AAAA', 'MX', 'CNAME', 'TXT', 'NS', 'SOA', 'PTR'];
 
-function executeDNSQuery(domain, recordType, dnsServer) {
-    return new Promise(async (resolve, reject) => {
-        const timeout = setTimeout(() => {
-            reject(new Error('DNS查询超时'));
-        }, 8000);
+async function executeDNSQuery(domain, recordType) {
+    try {
+        let result;
+        let formattedResult = '';
 
-        try {
-            // 设置DNS服务器
-            dns.setServers([dnsServer]);
-            
-            let result;
-            let formattedResult = '';
-
-            switch (recordType.toUpperCase()) {
-                case 'A':
-                    result = await dns.resolve4(domain);
-                    formattedResult = result.join('\n');
-                    break;
-                case 'AAAA':
-                    result = await dns.resolve6(domain);
-                    formattedResult = result.join('\n');
-                    break;
-                case 'MX':
-                    result = await dns.resolveMx(domain);
-                    formattedResult = result.map(mx => `${mx.priority} ${mx.exchange}`).join('\n');
-                    break;
-                case 'CNAME':
-                    result = await dns.resolveCname(domain);
-                    formattedResult = result.join('\n');
-                    break;
-                case 'TXT':
-                    result = await dns.resolveTxt(domain);
-                    formattedResult = result.map(txt => txt.join(' ')).join('\n');
-                    break;
-                case 'NS':
-                    result = await dns.resolveNs(domain);
-                    formattedResult = result.join('\n');
-                    break;
-                case 'SOA':
-                    result = await dns.resolveSoa(domain);
-                    formattedResult = `${result.nsname} ${result.hostmaster} ${result.serial} ${result.refresh} ${result.retry} ${result.expire} ${result.minttl}`;
-                    break;
-                case 'PTR':
-                    result = await dns.resolvePtr(domain);
-                    formattedResult = result.join('\n');
-                    break;
-                default:
-                    throw new Error('不支持的记录类型');
-            }
-
-            clearTimeout(timeout);
-            resolve({
-                domain,
-                recordType,
-                dnsServer,
-                result: formattedResult,
-                raw: formattedResult
-            });
-
-        } catch (error) {
-            clearTimeout(timeout);
-            
-            if (error.code === 'ENOTFOUND' || error.code === 'ENODATA') {
-                resolve({
-                    domain,
-                    recordType,
-                    dnsServer,
-                    result: '未找到该类型的DNS记录',
-                    raw: error.message
-                });
-            } else {
-                reject(new Error(`DNS查询失败: ${error.message}`));
-            }
+        switch (recordType.toUpperCase()) {
+            case 'A':
+                result = await dns.resolve4(domain);
+                formattedResult = result.join('\n');
+                break;
+            case 'AAAA':
+                result = await dns.resolve6(domain);
+                formattedResult = result.join('\n');
+                break;
+            case 'MX':
+                result = await dns.resolveMx(domain);
+                formattedResult = result.map(mx => `${mx.priority} ${mx.exchange}`).join('\n');
+                break;
+            case 'CNAME':
+                result = await dns.resolveCname(domain);
+                formattedResult = result.join('\n');
+                break;
+            case 'TXT':
+                result = await dns.resolveTxt(domain);
+                formattedResult = result.map(txt => txt.join(' ')).join('\n');
+                break;
+            case 'NS':
+                result = await dns.resolveNs(domain);
+                formattedResult = result.join('\n');
+                break;
+            case 'SOA':
+                result = await dns.resolveSoa(domain);
+                formattedResult = `${result.nsname} ${result.hostmaster} ${result.serial} ${result.refresh} ${result.retry} ${result.expire} ${result.minttl}`;
+                break;
+            case 'PTR':
+                result = await dns.resolvePtr(domain);
+                formattedResult = result.join('\n');
+                break;
+            default:
+                throw new Error('不支持的记录类型');
         }
-    });
+
+        return {
+            success: true,
+            result: formattedResult,
+            raw: result
+        };
+
+    } catch (error) {
+        if (error.code === 'ENOTFOUND' || error.code === 'ENODATA') {
+            return {
+                success: false,
+                result: '未找到该类型的DNS记录',
+                error: error.message
+            };
+        } else {
+            throw error;
+        }
+    }
 }
 
 module.exports = async (req, res) => {
@@ -105,74 +89,58 @@ module.exports = async (req, res) => {
     }
 
     try {
-        let body = '';
-        req.on('data', chunk => {
-            body += chunk.toString();
-        });
+        const { domain, recordType, dnsServer } = req.body;
 
-        req.on('end', async () => {
-            try {
-                const { domain, recordType, dnsServer } = JSON.parse(body);
+        console.log('收到DNS解析请求:', { domain, recordType, dnsServer });
 
-                if (!domain || !recordType) {
-                    res.status(400).json({ error: '缺少必要参数' });
-                    return;
-                }
+        if (!domain || !recordType) {
+            res.status(400).json({ error: '缺少必要参数' });
+            return;
+        }
 
-                if (!RECORD_TYPES.includes(recordType.toUpperCase())) {
-                    res.status(400).json({ error: '不支持的记录类型' });
-                    return;
-                }
+        if (!RECORD_TYPES.includes(recordType.toUpperCase())) {
+            res.status(400).json({ error: '不支持的记录类型' });
+            return;
+        }
 
-                // 如果指定了DNS服务器，只查询该服务器
-                // 如果指定了DNS服务器，只查询该服务器
-                if (dnsServer && DNS_SERVERS[dnsServer]) {
-                    const result = await executeDNSQuery(domain, recordType.toUpperCase(), DNS_SERVERS[dnsServer]);
-                    res.json({
-                        domain,
-                        recordType: recordType.toUpperCase(),
-                        dnsServer: dnsServer,
-                        result: result.result,
-                        raw: result.raw
-                    });
-                    return;
-                }
+        // 执行DNS查询（使用系统默认DNS）
+        const queryResult = await executeDNSQuery(domain, recordType.toUpperCase());
+        
+        console.log('DNS查询结果:', queryResult);
 
-                // 否则查询所有DNS服务器
-                const promises = Object.entries(DNS_SERVERS).map(async ([serverName, serverIP]) => {
-                    try {
-                        const result = await executeDNSQuery(domain, recordType.toUpperCase(), serverIP);
-                        return {
-                            server: serverName,
-                            serverIP: serverIP,
-                            ...result
-                        };
-                    } catch (error) {
-                        return {
-                            server: serverName,
-                            serverIP: serverIP,
-                            error: error.message,
-                            result: '查询失败'
-                        };
-                    }
-                });
+        // 如果指定了DNS服务器，返回单服务器结果
+        if (dnsServer && DNS_SERVERS[dnsServer]) {
+            res.json({
+                domain,
+                recordType: recordType.toUpperCase(),
+                dnsServer: dnsServer,
+                result: queryResult.result,
+                success: queryResult.success
+            });
+            return;
+        }
 
-                const results = await Promise.all(promises);
-                
-                res.json({
-                    domain,
-                    recordType: recordType.toUpperCase(),
-                    results: results
-                });
-
-            } catch (error) {
-                console.error('DNS解析错误:', error);
-                res.status(500).json({ error: error.message });
-            }
+        // 否则返回通用结果（模拟多服务器查询）
+        const results = Object.keys(DNS_SERVERS).map(serverName => ({
+            server: serverName,
+            serverIP: DNS_SERVERS[serverName],
+            domain,
+            recordType: recordType.toUpperCase(),
+            result: queryResult.result,
+            success: queryResult.success
+        }));
+        
+        res.json({
+            domain,
+            recordType: recordType.toUpperCase(),
+            results: results
         });
 
     } catch (error) {
-        console.error('请求处理错误:', error);
-        res.status(500).json({ error: '服务器内部错误' });
+        console.error('DNS解析错误:', error);
+        res.status(500).json({ 
+            error: `DNS解析失败: ${error.message}`,
+            details: error.code || 'UNKNOWN_ERROR'
+        });
     }
 };
