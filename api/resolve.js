@@ -20,18 +20,33 @@ async function executeDNSQuery(domain, recordType, dnsServerIP = null) {
         if (dnsServerIP) {
             resolver = new Resolver();
             resolver.setServers([dnsServerIP]);
+            // 设置超时时间
+            resolver.setTimeout(5000);
         } else {
             // 使用系统默认DNS
             resolver = dns;
         }
 
-        let result;
+        let result = [];
         let formattedResult = '';
 
         switch (recordType.toUpperCase()) {
             case 'A':
                 if (dnsServerIP) {
-                    result = await new Promise((resolve, reject) => {
+                    // 尝试多次查询以获取更多IP地址
+                    const queries = [];
+                    for (let i = 0; i < 3; i++) {
+                        queries.push(new Promise((resolve, reject) => {
+                            resolver.resolve4(domain, { ttl: false }, (err, addresses) => {
+                                if (err) resolve([]);
+                                else resolve(Array.isArray(addresses) ? addresses : [addresses]);
+                            });
+                        }));
+                    }
+                    
+                    const results = await Promise.all(queries);
+                    const allAddresses = [...new Set(results.flat())]; // 去重
+                    result = allAddresses.length > 0 ? allAddresses : await new Promise((resolve, reject) => {
                         resolver.resolve4(domain, (err, addresses) => {
                             if (err) reject(err);
                             else resolve(addresses);
@@ -215,15 +230,42 @@ module.exports = async (req, res) => {
         // 否则查询所有DNS服务器（真正的多服务器查询）
         const promises = Object.entries(DNS_SERVERS).map(async ([serverName, serverIP]) => {
             try {
-                const result = await executeDNSQuery(domain, recordType.toUpperCase(), serverIP);
+                // 对每个DNS服务器进行多次查询以获取更多IP
+                const multipleQueries = [];
+                for (let i = 0; i < 5; i++) {
+                    multipleQueries.push(executeDNSQuery(domain, recordType.toUpperCase(), serverIP));
+                    // 添加小延迟避免缓存
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                const queryResults = await Promise.all(multipleQueries);
+                const allAddresses = new Set();
+                
+                queryResults.forEach(result => {
+                    if (result.success && result.addresses) {
+                        result.addresses.forEach(addr => allAddresses.add(addr));
+                    }
+                });
+                
+                const uniqueAddresses = Array.from(allAddresses);
+                const finalResult = uniqueAddresses.length > 0 ? uniqueAddresses.join('\n') : queryResults[0].result;
+                
+                console.log(`${serverName} DNS查询结果:`, {
+                    queries: queryResults.length,
+                    uniqueAddresses: uniqueAddresses.length,
+                    addresses: uniqueAddresses
+                });
+                
                 return {
                     server: serverName,
                     serverIP: serverIP,
                     domain,
                     recordType: recordType.toUpperCase(),
-                    result: result.result,
-                    success: result.success,
-                    responseTime: Date.now() // 添加响应时间戳
+                    result: finalResult,
+                    success: uniqueAddresses.length > 0 || queryResults[0].success,
+                    addresses: uniqueAddresses,
+                    queryCount: queryResults.length,
+                    responseTime: Date.now()
                 };
             } catch (error) {
                 return {
