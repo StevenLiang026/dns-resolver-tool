@@ -187,14 +187,11 @@ module.exports = async (req, res) => {
             return;
         }
 
-        // 执行DNS查询（使用系统默认DNS）
-        const queryResult = await executeDNSQuery(domain, recordType.toUpperCase());
-        
-        console.log('DNS查询结果:', queryResult);
-
         // 如果指定了DNS服务器，返回单服务器结果
         if (dnsServer && DNS_SERVERS[dnsServer]) {
+            console.log('单服务器查询:', dnsServer, DNS_SERVERS[dnsServer]);
             const queryResult = await executeDNSQuery(domain, recordType.toUpperCase(), DNS_SERVERS[dnsServer]);
+            console.log('单服务器查询结果:', queryResult);
             res.json({
                 domain,
                 recordType: recordType.toUpperCase(),
@@ -204,6 +201,8 @@ module.exports = async (req, res) => {
             });
             return;
         }
+
+        console.log('开始多服务器查询...');
 
         // 否则查询所有DNS服务器（真正的多服务器查询）
         const promises = Object.entries(DNS_SERVERS).map(async ([serverName, serverIP]) => {
