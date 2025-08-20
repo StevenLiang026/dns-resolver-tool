@@ -194,12 +194,18 @@ module.exports = async (req, res) => {
             console.log('单服务器查询:', dnsServer, DNS_SERVERS[dnsServer]);
             const queryResult = await executeDNSQuery(domain, recordType.toUpperCase(), DNS_SERVERS[dnsServer]);
             console.log('单服务器查询结果:', queryResult);
+            console.log('原始结果数组:', queryResult.raw);
+            console.log('地址数量:', queryResult.count);
+            
             res.json({
                 domain,
                 recordType: recordType.toUpperCase(),
                 dnsServer: dnsServer,
                 result: queryResult.result,
-                success: queryResult.success
+                success: queryResult.success,
+                addresses: queryResult.addresses, // 添加原始地址数组
+                count: queryResult.count, // 添加地址数量
+                raw: queryResult.raw // 添加原始数据用于调试
             });
             return;
         }

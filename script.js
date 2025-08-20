@@ -316,15 +316,37 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } else if (data.result) {
             // 单服务器查询结果
-            console.log('处理单服务器查询结果');
+            console.log('处理单服务器查询结果', data);
             if (data.result !== '未找到该类型的DNS记录') {
+                // 优先使用addresses数组，如果没有则解析result字符串
+                const addresses = data.addresses || data.result.split('\n').filter(addr => addr.trim());
+                const addressCount = addresses.length;
+                
+                console.log('单服务器地址数据:', { addresses, addressCount, raw: data.raw });
+                
                 html += `
                     <div class="record-item success">
                         <span class="record-icon">✅</span>
                         <div class="record-details">
-                            <div class="record-value">${data.result.replace(/\n/g, '<br>')}</div>
-                            <div class="record-meta">
+                            <div class="record-header">
                                 <span class="dns-server">DNS服务器: ${data.dnsServer || 'Default'}</span>
+                                <span class="address-count">${addressCount} 个地址</span>
+                            </div>
+                            <div class="record-addresses">
+                `;
+                
+                // 为每个IP地址创建单独的显示项
+                addresses.forEach((address, index) => {
+                    html += `
+                        <div class="address-item">
+                            <span class="address-index">#${index + 1}</span>
+                            <span class="address-value">${address}</span>
+                            <button class="copy-btn" onclick="copyToClipboard('${address}')" title="复制IP地址">📋</button>
+                        </div>
+                    `;
+                });
+                
+                html += `
                             </div>
                         </div>
                     </div>
