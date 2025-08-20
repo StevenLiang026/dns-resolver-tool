@@ -269,13 +269,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 const success = serverResult.success;
                 
                 if (success && result !== '未找到该类型的DNS记录') {
+                    // 处理多个IP地址的显示
+                    const addresses = result.split('\n').filter(addr => addr.trim());
+                    const addressCount = addresses.length;
+                    
                     html += `
                         <div class="record-item success">
                             <span class="record-icon">✅</span>
                             <div class="record-details">
-                                <div class="record-value">${result.replace(/\n/g, '<br>')}</div>
-                                <div class="record-meta">
+                                <div class="record-header">
                                     <span class="dns-server">${serverName.toUpperCase()} DNS (${serverIP})</span>
+                                    <span class="address-count">${addressCount} 个地址</span>
+                                </div>
+                                <div class="record-addresses">
+                    `;
+                    
+                    // 为每个IP地址创建单独的显示项
+                    addresses.forEach((address, index) => {
+                        html += `
+                            <div class="address-item">
+                                <span class="address-index">#${index + 1}</span>
+                                <span class="address-value">${address}</span>
+                                <button class="copy-btn" onclick="copyToClipboard('${address}')" title="复制IP地址">📋</button>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
                                 </div>
                             </div>
                         </div>
@@ -408,5 +428,106 @@ document.addEventListener('DOMContentLoaded', function() {
         URL.revokeObjectURL(link.href);
     }
     
+    // 复制到剪贴板函数
+    window.copyToClipboard = function(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            // 使用现代 Clipboard API
+            navigator.clipboard.writeText(text).then(() => {
+                showCopySuccess();
+            }).catch(err => {
+                console.error('复制失败:', err);
+                fallbackCopyTextToClipboard(text);
+            });
+        } else {
+            // 降级方案
+            fallbackCopyTextToClipboard(text);
+        }
+    };
+
+    // 降级复制方案
+    function fallbackCopyTextToClipboard(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                showCopySuccess();
+            } else {
+                console.error('复制失败');
+            }
+        } catch (err) {
+            console.error('复制失败:', err);
+        }
+        
+        document.body.removeChild(textArea);
+    }
+
+    // 显示复制成功提示
+    function showCopySuccess() {
+        // 创建临时提示元素
+        const toast = document.createElement('div');
+        toast.textContent = '✅ IP地址已复制到剪贴板';
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+            animation: slideInRight 0.3s ease-out;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // 3秒后自动移除
+        setTimeout(() => {
+            toast.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    }
+
     console.log('DNS解析工具脚本已加载完成');
 });
+
+// 添加动画样式
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+`;
+document.head.appendChild(style);

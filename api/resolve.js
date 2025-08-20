@@ -140,7 +140,9 @@ async function executeDNSQuery(domain, recordType, dnsServerIP = null) {
         return {
             success: true,
             result: formattedResult,
-            raw: result
+            raw: result,
+            addresses: Array.isArray(result) ? result : [result], // 保留原始IP数组
+            count: Array.isArray(result) ? result.length : 1 // IP地址数量
         };
 
     } catch (error) {
