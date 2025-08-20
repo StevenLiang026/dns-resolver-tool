@@ -241,6 +241,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayResults(data) {
         if (!resultsContent) return;
         
+        console.log('显示结果数据:', data);
+        
         let html = `
             <div class="dns-results">
                 <div class="results-header">
@@ -256,39 +258,91 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="records-list">
         `;
         
-        // 处理简单的DNS查询结果
-        if (data.result && data.result !== '未找到该类型的DNS记录') {
-            html += `
-                <div class="record-item success">
-                    <span class="record-icon">✅</span>
-                    <div class="record-details">
-                        <div class="record-value">${data.result.replace(/\n/g, '<br>')}</div>
-                        <div class="record-meta">
-                            <span class="dns-server">DNS服务器: ${data.dnsServer || 'Google'}</span>
+        // 检查是单服务器查询还是多服务器查询
+        if (data.results && Array.isArray(data.results)) {
+            // 多服务器查询结果
+            console.log('处理多服务器查询结果');
+            data.results.forEach(serverResult => {
+                const serverName = serverResult.server || 'Unknown';
+                const serverIP = serverResult.serverIP || '';
+                const result = serverResult.result || '查询失败';
+                const success = serverResult.success;
+                
+                if (success && result !== '未找到该类型的DNS记录') {
+                    html += `
+                        <div class="record-item success">
+                            <span class="record-icon">✅</span>
+                            <div class="record-details">
+                                <div class="record-value">${result.replace(/\n/g, '<br>')}</div>
+                                <div class="record-meta">
+                                    <span class="dns-server">${serverName.toUpperCase()} DNS (${serverIP})</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="record-item warning">
+                            <span class="record-icon">⚠️</span>
+                            <div class="record-details">
+                                <div class="record-value">${result}</div>
+                                <div class="record-meta">
+                                    <span class="dns-server">${serverName.toUpperCase()} DNS (${serverIP})</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        } else if (data.result) {
+            // 单服务器查询结果
+            console.log('处理单服务器查询结果');
+            if (data.result !== '未找到该类型的DNS记录') {
+                html += `
+                    <div class="record-item success">
+                        <span class="record-icon">✅</span>
+                        <div class="record-details">
+                            <div class="record-value">${data.result.replace(/\n/g, '<br>')}</div>
+                            <div class="record-meta">
+                                <span class="dns-server">DNS服务器: ${data.dnsServer || 'Default'}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // 显示未找到记录的友好提示
+                const suggestions = {
+                    'A': '建议检查域名是否正确，或尝试 CNAME 记录',
+                    'AAAA': '该域名可能不支持IPv6，建议尝试 A 记录',
+                    'CNAME': '该域名可能是根域名，建议尝试 A 记录',
+                    'MX': '该域名可能没有配置邮件服务，这是正常的',
+                    'NS': '该域名可能没有配置名称服务器记录',
+                    'TXT': '该域名没有配置文本记录，这是正常的',
+                    'SOA': '该域名可能没有权威记录',
+                    'PTR': '该IP地址没有反向DNS记录'
+                };
+                
+                html += `
+                    <div class="record-item info">
+                        <span class="record-icon">ℹ️</span>
+                        <div class="record-details">
+                            <span class="record-value">该域名没有 ${data.recordType || 'DNS'} 记录</span>
+                            <div class="record-meta">
+                                <span class="suggestion">💡 ${suggestions[data.recordType] || '建议尝试其他记录类型'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         } else {
-            // 显示未找到记录的友好提示
-            const suggestions = {
-                'A': '建议检查域名是否正确，或尝试 CNAME 记录',
-                'AAAA': '该域名可能不支持IPv6，建议尝试 A 记录',
-                'CNAME': '该域名可能是根域名，建议尝试 A 记录',
-                'MX': '该域名可能没有配置邮件服务，这是正常的',
-                'NS': '该域名可能没有配置名称服务器记录',
-                'TXT': '该域名没有配置文本记录，这是正常的',
-                'SOA': '该域名可能没有权威记录',
-                'PTR': '该IP地址没有反向DNS记录'
-            };
-            
+            // 没有结果数据
             html += `
-                <div class="record-item info">
-                    <span class="record-icon">ℹ️</span>
+                <div class="record-item error">
+                    <span class="record-icon">❌</span>
                     <div class="record-details">
-                        <span class="record-value">该域名没有 ${data.recordType || 'DNS'} 记录</span>
+                        <span class="record-value">DNS解析失败，没有返回结果</span>
                         <div class="record-meta">
-                            <span class="suggestion">💡 ${suggestions[data.recordType] || '建议尝试其他记录类型'}</span>
+                            <span class="suggestion">💡 请检查网络连接或稍后重试</span>
                         </div>
                     </div>
                 </div>
