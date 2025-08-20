@@ -1,5 +1,7 @@
 const dns = require('dns').promises;
 const { Resolver } = require('dns');
+const { spawn } = require('child_process');
+const util = require('util');
 
 // DNS服务器配置
 const DNS_SERVERS = {
@@ -12,23 +14,87 @@ const DNS_SERVERS = {
 // DNS记录类型
 const RECORD_TYPES = ['A', 'AAAA', 'MX', 'CNAME', 'TXT', 'NS', 'SOA', 'PTR'];
 
+// 使用系统dig命令查询DNS（获取所有IP地址）
+async function executeDigQuery(domain, recordType, dnsServerIP) {
+    return new Promise((resolve, reject) => {
+        const args = [];
+        
+        if (dnsServerIP) {
+            args.push(`@${dnsServerIP}`);
+        }
+        
+        args.push(domain, recordType, '+short', '+time=5');
+        
+        const dig = spawn('dig', args);
+        let output = '';
+        let error = '';
+        
+        dig.stdout.on('data', (data) => {
+            output += data.toString();
+        });
+        
+        dig.stderr.on('data', (data) => {
+            error += data.toString();
+        });
+        
+        dig.on('close', (code) => {
+            if (code === 0 && output.trim()) {
+                const addresses = output.trim().split('\n').filter(line => line.trim());
+                resolve(addresses);
+            } else {
+                reject(new Error(error || 'dig命令执行失败'));
+            }
+        });
+        
+        dig.on('error', (err) => {
+            reject(err);
+        });
+        
+        // 5秒超时
+        setTimeout(() => {
+            dig.kill();
+            reject(new Error('DNS查询超时'));
+        }, 5000);
+    });
+}
+
 async function executeDNSQuery(domain, recordType, dnsServerIP = null) {
     try {
+        let result = [];
+        let formattedResult = '';
+
+        // 首先尝试使用dig命令获取所有IP地址
+        if (recordType.toUpperCase() === 'A' && dnsServerIP) {
+            try {
+                result = await executeDigQuery(domain, recordType, dnsServerIP);
+                console.log(`dig查询结果 (${dnsServerIP}):`, result);
+                
+                if (result && result.length > 0) {
+                    formattedResult = result.join('\n');
+                    return {
+                        success: true,
+                        result: formattedResult,
+                        raw: result,
+                        addresses: result,
+                        count: result.length,
+                        method: 'dig'
+                    };
+                }
+            } catch (digError) {
+                console.log(`dig查询失败，回退到Node.js DNS: ${digError.message}`);
+            }
+        }
+
+        // 回退到Node.js DNS模块
         let resolver;
         
-        // 如果指定了DNS服务器，创建专用解析器
         if (dnsServerIP) {
             resolver = new Resolver();
             resolver.setServers([dnsServerIP]);
-            // 设置超时时间
             resolver.setTimeout(5000);
         } else {
-            // 使用系统默认DNS
             resolver = dns;
         }
-
-        let result = [];
-        let formattedResult = '';
 
         switch (recordType.toUpperCase()) {
             case 'A':
