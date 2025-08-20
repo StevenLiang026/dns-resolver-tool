@@ -45,7 +45,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('开始解析...');
         
         const domain = domainInput.value.trim();
-        const domain = domainInput.value.trim();
         const recordType = recordTypeSelect.value;
         const dnsServer = dnsServerInput.value;
         
